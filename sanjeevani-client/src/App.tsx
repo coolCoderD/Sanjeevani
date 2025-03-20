@@ -16,6 +16,7 @@ import AIAssistant from "./pages/AIAssistant";
 import MedicalReports from "./pages/MedicalReports";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Reports from "./pages/Reports";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => (
           <Route path="/diet-fitness" element={<DietFitness />} />
           <Route path="/ai-assistant" element={<AIAssistant />} />
           <Route path="/medical-reports" element={<MedicalReports />} />
+          <Route path='/report' element={<Reports/>}/>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

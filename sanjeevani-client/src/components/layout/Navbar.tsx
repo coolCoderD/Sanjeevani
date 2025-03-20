@@ -76,14 +76,14 @@ const Navbar = () => {
                 </li>
               ))}
             </ul>
-            <div className="flex items-center gap-4">
+            {/* <div className="flex items-center gap-4">
               <CustomButton variant="outline" size="default" onClick={handleLogin}>
                 Log In
               </CustomButton>
               <CustomButton variant="health" size="default" onClick={handleSignup}>
                 Sign Up
               </CustomButton>
-            </div>
+            </div> */}
           </div>
 
           {/* Mobile Menu Button */}
@@ -132,14 +132,14 @@ const Navbar = () => {
               </li>
             ))}
           </ul>
-          <div className="mt-6 flex flex-col gap-4 px-4">
+          {/* <div className="mt-6 flex flex-col gap-4 px-4">
             <CustomButton variant="outline" size="lg" className="w-full" onClick={handleLogin}>
               Log In
             </CustomButton>
             <CustomButton variant="health" size="lg" className="w-full" onClick={handleSignup}>
               Sign Up
             </CustomButton>
-          </div>
+          </div> */}
         </div>
       </div>
     </nav>
