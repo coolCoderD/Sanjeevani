@@ -9,7 +9,8 @@ import { addReport,
     reportAddSignedURL,
     addChatReport,
     patientChat,
-    createPatient, } from '../controllers/patientController.js';
+    createPatient,
+    createDietPlan, } from '../controllers/patientController.js';
 
 
 
@@ -38,7 +39,7 @@ router.post("/reports/query", queryReports);
 router.post("/reports/query/date", queryDateVal);
 
 // Patient chat with AI assistant
-router.post("/patient/chat", patientChat);
+router.post("/reports/chat", patientChat);
 
 // Get patient's medicine list
 router.post("/medicines/get", getMedicines);
@@ -47,6 +48,8 @@ router.post("/medicines/get", getMedicines);
 router.put("/medicines/toggle-status", toggleMedicineStatus);
 
 router.post("/patients/add", createPatient);
+
+router.get("/reports/diet",createDietPlan);
 
 
 router.get("/", (req, res) => {

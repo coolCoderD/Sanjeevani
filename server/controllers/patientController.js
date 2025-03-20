@@ -4,6 +4,7 @@ import { extractTextFromPDF,getBlobURL,getUploadURL,deleteBlob } from "../utils/
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import axios from "axios";
+import { makeUniqueFileName } from "../utils/helper.js";
 
 
 const getReportList = asyncHandler(async (req, res) => {
@@ -11,6 +12,7 @@ const getReportList = asyncHandler(async (req, res) => {
         // Fetch patient directly using provided ID (since there's no User model)
         const patient = await Patient.findById(req.params.id || req.body.id).populate("reportsList");
         console.log("🔍 Checking patient ID:", req.params.id || req.body.id);
+        console.log("✅ Patient fetch completed:", patient);
 
         if (!patient) {
             throw new ApiError(404, "Patient not found");
@@ -31,10 +33,17 @@ const getReportList = asyncHandler(async (req, res) => {
             }))
             .sort((a, b) => parseDate(b.reportDate) - parseDate(a.reportDate));
 
+            for (const report of sortedReportsList) {
+              console.log("Fetching Blob URL for:", report.reportPDFLink);
+              report.reportPDFLink = await getBlobURL(report.reportPDFLink);
+              console.log("✅ Fetched Blob URL:", report.reportPDFLink);
+          }
+          
+
         // Process each report
         const reportList = [];
         for (const report of sortedReportsList) {
-            report.reportPDFLink = await getBlobURL(undefined,report.reportPDFLink);
+            report.reportPDFLink = await getBlobURL(report.reportPDFLink);
             report.cid = report.cid ? `https://ipfs.io/ipfs/${report.cid}` : report.reportPDFLink;
             reportList.push(report);
         }
@@ -49,87 +58,110 @@ const getReportList = asyncHandler(async (req, res) => {
 });
 
 
-const addReport = asyncHandler(async (req, res) => {
-    try {
+const addReport = asyncHandler(async (req, res, next) => {
+  try {
       const { reportName, location, reportDate, reportPDFLink, cid, containerName } = req.body;
-  
-      // Fetch patient directly (no user, only patient exists)
       const patient = await Patient.findById(req.params.patientId);
-      if (!patient) {
-        throw new ApiError(404, "Patient not found");
-      }
-  
-      // Extract text from the PDF stored in Azure Blob Storage
-      const reportPDFText = extractTextFromPDF(containerName, reportPDFLink);
-  
+      if (!patient) return next(new ApiError(404, "Patient not found"));
+
+      // Extract text from PDF
+      let reportPDFText = String(await extractTextFromPDF(reportPDFLink));
+      console.log("🔍 Extracted Report Text:", reportPDFText);
+
       // Knowledge base update logic
       const cntOfReports = patient.reportsList.length;
       let absText = patient.absoluteSummary;
-  
+
       if (cntOfReports > 0 && cntOfReports % 10 === 0) {
-        // Reset absolute summary after every 10 reports
-        let newAbsoluteText = patient.lastAbsoluteSummary;
-        let index = cntOfReports - 1;
-        let cnt = 9;
-        while (index-- && cnt--) {
-          newAbsoluteText += patient.reportsList[index].reportSummary;
-        }
-        absText = newAbsoluteText;
+          absText = patient.lastAbsoluteSummary || "";
+          for (let i = Math.max(0, cntOfReports - 10); i < cntOfReports; i++) {
+              absText += patient.reportsList[i].reportSummary;
+          }
       }
-  
-      // Call Flask server to update knowledge base
+
+      // Send data to Flask for knowledge base update
+      let reportSummary;
       try {
-        const reportSummary = await axios.post(`${process.env.FLASK_SERVER}/reports/update_kb`, {
-            reportText: reportPDFText,
-            absoluteText: absText,
-        });
-        console.log("✅ Report Summary Response:", reportSummary.data);
-    } catch (axiosError) {
-        console.error("❌ Error in Flask request:", axiosError.response?.data || axiosError.message);
-        throw new ApiError(500, "Failed to update knowledge base");
-    }
-  
-      if (cntOfReports > 0 && cntOfReports % 10 === 0) {
-        patient.lastAbsoluteSummary = reportSummary.data.newAbsoluteText;
+          const response = await axios.post(
+              `${process.env.FLASK_SERVER}/reports/update_kb`,
+              { reportText: reportPDFText, absoluteText: absText },
+              { headers: { "Content-Type": "application/json" } }
+          );
+          reportSummary = response.data;
+      } catch (axiosError) {
+          console.error("❌ Error in Flask request:", axiosError.response?.data || axiosError.message);
+          return next(new ApiError(500, "Failed to update knowledge base"));
       }
-  
-      // Add report details to patient's reportsList
+
+      const { indReportSummary, newAbsoluteText } = reportSummary;
+      if (!indReportSummary || !newAbsoluteText) {
+          return next(new ApiError(500, "Invalid response from knowledge base update"));
+      }
+
+      if (cntOfReports > 0 && cntOfReports % 10 === 0) {
+          patient.lastAbsoluteSummary = newAbsoluteText;
+      }
+      let fileURL = await getBlobURL(reportPDFLink);
+      const url = await getUploadURL(reportPDFLink, 600);
+      console.log("⭐⭐ Generated Upload URL:", url);
+      
+      // Create new report object
       const newReport = {
-        reportName,
-        reportDate,
-        location,
-        reportPDFLink,
-        cid,
-        reportPDFText,
-        reportSummary: reportSummary.data.indReportSummary,
+          reportName,
+          reportDate,
+          location,
+          reportPDFLink,
+          url,
+          cid,
+          reportPDFText,
+          reportSummary: indReportSummary,
       };
-  
+
+      // Update patient data
       patient.reportsList.push(newReport);
-      patient.absoluteSummary = reportSummary.data.newAbsoluteText;
+      patient.absoluteSummary = newAbsoluteText;
       await patient.save();
-  
-      // Report embedding logic
-      const reportEmbedding = await axios.post(`${process.env.FLASK_SERVER}/reports/embed_report`, {
-        reportText: reportPDFText,
-        reportId: patient.reportsList[patient.reportsList.length - 1]._id,
-        patientId: patient._id,
-        url: await getBlobURL(containerName, reportPDFLink),
-        date: reportDate,
-      });
-  
-      return res.status(200).json(
-        new ApiResponse(200, { patient, reportSummary: newReport.reportSummary }, "Report added successfully")
-      );
-    } catch (error) {
+
+      // Generate Blob URL
+    
+      try {
+          fileURL = await getBlobURL(reportPDFLink);
+          console.log("📄 Blob File URL:", fileURL);
+      } catch (error) {
+          console.error("❌ Error generating Blob URL:", error);
+          return next(new ApiError(500, "Failed to generate report URL"));
+      }
+
+      // Embed report in Flask system
+      try {
+          await axios.post(
+              `${process.env.FLASK_SERVER}/reports/embed_report`,
+              {
+                  reportText: reportPDFText,
+                  reportId: patient.reportsList[patient.reportsList.length - 1]._id,
+                  patientId: patient._id,
+                  url: fileURL,
+                  date: reportDate,
+              },
+              { headers: { "Content-Type": "application/json" } }
+          );
+      } catch (axiosError) {
+          console.error("❌ Error embedding report:", axiosError.response?.data || axiosError.message);
+          return next(new ApiError(500, "Failed to embed report"));
+      }
+
+      return res.status(200).json(new ApiResponse(200, { patient, reportSummary: indReportSummary }, "Report added successfully"));
+  } catch (error) {
       console.error("❌ Error in addReport:", error);
-      throw new ApiError(500, "Something went wrong in addReport");
-    }
-  });
-  
+      return next(new ApiError(500, "Something went wrong in addReport"));
+  }
+});
+
 
 const addChatReport = asyncHandler(async (req, res) => {
   try {
     const { reportDate, reportPDFText } = req.body;
+    console.log("i am here")
 
     // Fetch patient directly (no user)
     const patient = await Patient.findById(req.params.patientId);
@@ -189,33 +221,37 @@ const addChatReport = asyncHandler(async (req, res) => {
 
 
 const reportAddSignedURL = asyncHandler(async (req, res) => {
-    try {
-      const { reportName, patientId } = req.body; // Accept patientId directly
-  
-      // Fetch patient directly (no user)
-      const patient = await Patient.findById(patientId);
-      if (!patient) {
-        throw new ApiError(404, "Patient not found");
+  try {
+      const { reportName, patientId } = req.body;
+
+      if (!reportName || !patientId) {
+          throw new ApiError(400, "Report name and patient ID are required");
       }
-  
-      // Generate unique file name for Azure Blob Storage
-      const nameOfFile = `Reports/${makeUniqueFileName(reportName, patientId)}.pdf`;
-  
+
+      // Generate unique file name
+      const timestamp = Date.now();
+      const reportPDFLink = `Reports/${patientId}_${reportName}_${timestamp}.pdf`;
+
+      console.log("📌 Blob Name (File Path):", reportPDFLink);
+
       // Get Azure Blob upload URL
-      const url = await getUploadURL(process.env.AZURE_CONTAINER_NAME, nameOfFile, 600);
-  
+      const url = await getUploadURL(reportPDFLink, 600);
+      
+      console.log("✅ Generated Upload URL:", url);
+
       return res.status(200).json(
-        new ApiResponse(
-          200,
-          { url, reportPDFLink: nameOfFile },
-          "Report signed URL generated successfully"
-        )
+          new ApiResponse(
+              200,
+              { url, reportPDFLink },  // ✅ Include `reportPDFLink`
+              "Report signed URL generated successfully"
+          )
       );
-    } catch (error) {
+  } catch (error) {
       console.error("❌ Error in reportAddSignedURL:", error);
       throw new ApiError(500, "Something went wrong in reportAddSignedURL");
-    }
-  });
+  }
+});
+
 
 
   const removeReport = asyncHandler(async (req, res) => {
@@ -245,7 +281,14 @@ const reportAddSignedURL = asyncHandler(async (req, res) => {
       await patient.save();
   
       // Delete report from Azure Storage
-      await deleteBlob(process.env.AZURE_CONTAINER_NAME, reportPDFLink);
+      await Promise.race([
+        deleteBlob(reportPDFLink),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("❌ Timeout: deleteBlob")), 5000)
+        ),
+    ]);
+    console.log("✅ Report deleted from Azure Storage");
+    
   
       return res.status(200).json(
         new ApiResponse(
@@ -263,6 +306,7 @@ const reportAddSignedURL = asyncHandler(async (req, res) => {
   const queryReports = asyncHandler(async (req, res) => {
     try {
       const { patientId, queryText } = req.body;
+      console.log("🔍 Query Text:", queryText);
   
       // Find the patient
       const patient = await Patient.findById(patientId);
@@ -314,27 +358,19 @@ const reportAddSignedURL = asyncHandler(async (req, res) => {
 
   const patientChat = asyncHandler(async (req, res) => {
     try {
-      const { prompt, context } = req.body;
+      const { patientId,prompt, context } = req.body;
   
-      // Prevent doctors from accessing this feature
-      if (req.user.isDoctor) {
-        throw new ApiError(401, "Unauthorized access");
-      }
-  
-      // Fetch user and patient details
-      const user = await User.findById(req.user._id).populate("patientDetails");
-      if (!user || !user.patientDetails) {
-        throw new ApiError(404, "Patient not found");
-      }
-  
-      const patient = await Patient.findById(user.patientDetails._id);
+      // Fetch the patient directly
+      const patient = await Patient.findById(patientId);
       if (!patient) {
         throw new ApiError(404, "Patient not found");
       }
   
       // Extract medicines list and doctor notes
-      const medicines = patient.medicinesList?.map((m) => m.medicine).join(", ") || "No medicines prescribed";
-      const notes = patient.doctorsNotes?.map((note) => note.note).join(", ") || "No doctor notes available";
+      const medicines =
+        patient.medicinesList?.map((m) => m.medicine).join(", ") || "No medicines prescribed";
+  
+      const notes = patient.medicalHistorySummary || "No doctor notes available";
   
       // Send request to Flask AI chat model
       const resp = await axios.post(`${process.env.FLASK_SERVER}/patientChat/chat`, {
@@ -345,10 +381,9 @@ const reportAddSignedURL = asyncHandler(async (req, res) => {
         patientId: patient._id
       });
   
-      return res.status(200).json(
-        new ApiResponse(200, resp.data, "Chat response retrieved successfully")
-      );
-  
+      return res
+        .status(200)
+        .json(new ApiResponse(200, resp.data, "Chat response retrieved successfully"));
     } catch (error) {
       console.error(error);
       throw new ApiError(500, "Something went wrong in patientChat");
@@ -472,7 +507,28 @@ const reportAddSignedURL = asyncHandler(async (req, res) => {
       throw new ApiError(500, "Something went wrong in toggleMedicineStatus");
     }
   });
+
+  const createDietPlan = async (req, res) => {
+    try {
+      const { patientId } = req.body;
   
+      // Validate patientId
+      if (!patientId || !mongoose.Types.ObjectId.isValid(patientId)) {
+        return res.status(400).json({ error: "Invalid patientId" });
+      }
+  
+      // Send request to Flask API
+      const response = await axios.post(`${FLASK_API_URL}/generate-diet-plan`, {
+        patientId,
+      });
+  
+      res.status(201).json(response.data);
+    } catch (error) {
+      res.status(error.response?.status || 500).json({
+        error: error.response?.data?.error || "Failed to generate diet plan",
+      });
+    }
+  };
 
   
 export const createPatient = asyncHandler(async (req, res) => {
@@ -533,6 +589,5 @@ export{
     reportAddSignedURL,
     addChatReport,
     patientChat,
-
-
+    createDietPlan
 }

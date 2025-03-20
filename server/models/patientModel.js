@@ -59,6 +59,9 @@ const patientSchema = new mongoose.Schema({
             reportPDFLink: {
                 type: String,
             },
+            url:{
+                type: String,
+            },
             reportPDFText: {
                 type: String,
             },
