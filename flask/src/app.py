@@ -20,14 +20,18 @@ app.wsgi_app = ProxyFix(app.wsgi_app)  # Equivalent to serving static files
 app.static_folder = 'public'
 
 #  Reports routes
-app.register_blueprint(report_bp, url_prefix="/api/v1/reports")
+app.register_blueprint(report_bp, url_prefix="/reports")
 
 # Patient chat routes
-app.register_blueprint(patient_chat_bp, url_prefix="/api/v1/patientChat")
+app.register_blueprint(patient_chat_bp, url_prefix="/patientChat")
 
 # Doctor chat routes
-app.register_blueprint(doctor_chat_bp, url_prefix="/api/v1/doctorChat")
+# app.register_blueprint(doctor_chat_bp, url_prefix="/api/v1/doctorChat")
+
+
+
 
 @app.route("/", methods=["GET"])
 def home():
     return jsonify({"message": "Welcome to the Flask API!"})
+

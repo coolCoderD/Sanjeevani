@@ -30,8 +30,8 @@ def update_kb():
         ]
     )
     data = request.get_json()
-    report_text = data.get('reportText')
-    absolute_text = data.get('absoluteText')
+    report_text = data.get('reportText',"")
+    absolute_text = data.get('absoluteText',"")
 
     # Summarize individual report
     ind_report_summary = chat_session.send_message("Summarize this report for a doctor keeping only the medically relevant parts. Make it crisp and only the parts doctor needs to worry about. Make sure to bold the parts which are more important: "+report_text)
@@ -267,3 +267,42 @@ def dateValQuery():
         "description": description,
         "title": title,
     }, 201
+    
+def generate_diet_plan():
+    genai.configure(api_key=os.getenv("GENAI_API_KEY"))
+    generation_config = {
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_output_tokens": 2000,
+        "response_mime_type": "text/plain",
+    }
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config=generation_config,
+    )
+    chat_session = model.start_chat(history=[])
+
+    data = request.get_json()
+    patientId = data.get("patientId")
+
+    # Query for medical report data
+    report_data, status = dateValQuery()
+    
+    if status != 201:
+        return jsonify({"error": "Failed to fetch report data"}), 400
+
+    # Extract key metrics
+    health_data = f"Patient ID: {patientId}\n"
+    health_data += f"Key Health Metrics: {report_data['list']}\n"
+    health_data += f"Description: {report_data['description']}\n"
+    
+    # Generate diet plan
+    diet_plan_response = chat_session.send_message(
+        health_data + " Suggest a personalized diet plan to improve the patient's health."
+    )
+    
+    return jsonify({
+        "message": "Diet plan generated successfully",
+        "diet_plan": diet_plan_response.text
+    }), 201

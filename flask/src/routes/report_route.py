@@ -1,5 +1,5 @@
 from flask import Blueprint, request
-from  controllers.report_controller import update_kb, embed_report, generalReportQuery, dateValQuery
+from  src.controllers.report_controller import update_kb, embed_report, generalReportQuery, dateValQuery , generate_diet_plan
 
 report_bp = Blueprint('report_bp', __name__)
 
@@ -18,3 +18,7 @@ def reportQuery():
 @report_bp.route('/dateValQuery', methods=['POST'])
 def date_val_Query():    
     return dateValQuery()
+
+@report_bp.route('/diet_plan', methods=['GET'])
+def diet_plan():    
+    return generate_diet_plan()
