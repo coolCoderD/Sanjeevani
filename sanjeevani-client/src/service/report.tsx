@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000/api/reports";
+const API_BASE_URL = "https://sanjeevani-9tir.onrender.com/api/reports";
 
 // Fetch reports
 export const fetchReports = async (patientId, setReports, setError, setLoading) => {
