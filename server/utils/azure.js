@@ -42,7 +42,7 @@ const generateBlobSasToken = (containerName, blobName) => {
       containerName,
       blobName,
       permissions: BlobSASPermissions.parse("rw"), // 'r' (read-only access)
-      expiresOn: new Date(new Date().valueOf() + 3600 * 1000), // 1 hour expiry
+      expiresOn: new Date(new Date().valueOf() + 365 * 24 * 60 * 60 * 1000), // 1-year expiry
   };
 
   return generateBlobSASQueryParameters(sasOptions, sharedKeyCredential).toString();
