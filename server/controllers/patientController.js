@@ -5,6 +5,7 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import axios from "axios";
 import { makeUniqueFileName } from "../utils/helper.js";
+import mongoose from "mongoose";
 
 
 const getReportList = asyncHandler(async (req, res) => {
@@ -508,27 +509,47 @@ const reportAddSignedURL = asyncHandler(async (req, res) => {
     }
   });
 
+
   const createDietPlan = async (req, res) => {
-    try {
-      const { patientId } = req.body;
+      console.log("Creating Diet Plan...");
   
-      // Validate patientId
-      if (!patientId || !mongoose.Types.ObjectId.isValid(patientId)) {
-        return res.status(400).json({ error: "Invalid patientId" });
+      try {
+          console.log("Received request body:", req.body);
+  
+          const { patientId } = req.body;
+          if (!patientId) {
+              return res.status(400).json({ error: "Patient ID is required" });
+          }
+  
+          // Fetch patient data
+          const patient = await Patient.findById(patientId);
+          if (!patient) {
+              return res.status(404).json({ error: "Patient not found" });
+          }
+  
+          // Prepare full patient details
+          const patientData = patient.toObject(); // Convert Mongoose document to plain object
+          delete patientData._id; // Remove MongoDB ID if not needed
+  
+          // Send request to Flask API
+          const response = await axios.post(`${process.env.FLASK_SERVER}/reports/dietPlan`, patientData, {
+              headers: { "Content-Type": "application/json" },
+          });
+  
+          console.log("Flask API Response:", response.data);
+          res.status(201).json(response.data);
+      } catch (error) {
+          console.error("Diet Plan Error:", error.toJSON ? error.toJSON() : error);
+  
+          res.status(error.response?.status || 500).json({
+              error: error.response?.data?.error || "Failed to generate diet plan",
+          });
       }
-  
-      // Send request to Flask API
-      const response = await axios.post(`${FLASK_API_URL}/generate-diet-plan`, {
-        patientId,
-      });
-  
-      res.status(201).json(response.data);
-    } catch (error) {
-      res.status(error.response?.status || 500).json({
-        error: error.response?.data?.error || "Failed to generate diet plan",
-      });
-    }
   };
+  
+
+  
+  
 
   
 export const createPatient = asyncHandler(async (req, res) => {

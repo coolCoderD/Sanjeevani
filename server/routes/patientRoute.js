@@ -49,7 +49,7 @@ router.put("/medicines/toggle-status", toggleMedicineStatus);
 
 router.post("/patients/add", createPatient);
 
-router.get("/reports/diet",createDietPlan);
+router.post("/reports/diet",createDietPlan);
 
 
 router.get("/", (req, res) => {
