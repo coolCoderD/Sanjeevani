@@ -25,8 +25,8 @@ const DietFitness = () => {
 
     try {
       const response = await axios.post(
-        `https://sanjeevani-9tir.onrender.com/api/reports/diet`,
-        { patientId: "67db196b1ec10de398f4ca50" }
+        `http://localhost:5000/api/reports/diet`,
+        { patientId: "67de81a66e6820d3446eaa22" }
       );
 
       setDietPlan(response.data.diet_plan);
@@ -105,10 +105,10 @@ const DietFitness = () => {
                     </CardContent>
                   </Card>
 
-                  {/* <div className="bg-health-50 rounded-lg p-6">
+                   <div className="bg-health-50 rounded-lg p-6">
                     <h3 className="text-lg font-medium mb-4">Dietary Notes</h3>
                     <p className="text-muted-foreground">{dietPlan.Notes}</p>
-                  </div> */}
+                  </div> 
                 </FadeIn>
               ) : (
                 <div className="text-center">

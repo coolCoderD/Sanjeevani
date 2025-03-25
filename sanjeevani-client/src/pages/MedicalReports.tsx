@@ -62,7 +62,7 @@ import AIAssistant from "./AIAssistant";
 //   { id: 3, name: 'Annual Health Checkup', date: '2023-08-05', type: 'PDF', size: '2.5 MB' },
 // ];
 
-const patientId = "67db196b1ec10de398f4ca50";
+const patientId = "67de81a66e6820d3446eaa22";
 
 const MedicalReports = () => {
   const [reports, setReports] = useState([]);

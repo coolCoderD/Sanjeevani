@@ -182,12 +182,7 @@ const Dashboard = () => {
                           Predictive Health Alerts
                         </h3>
                         <p className="text-sm text-muted-foreground">
-                          <Badge
-                            variant="outline"
-                            className="bg-red-50 text-red-700 mr-2"
-                          >
-                            1 HIGH
-                          </Badge>
+
                           Potential health risks
                         </p>
                       </div>
