@@ -546,7 +546,46 @@ const reportAddSignedURL = asyncHandler(async (req, res) => {
           });
       }
   };
-  
+
+
+ export  const createHealthAlerts = async (req, res) => {
+    console.log("Generating Health Alerts...");
+
+    try {
+        console.log("Received request body:", req.body);
+
+        const { patientId } = req.body;
+        if (!patientId) {
+            return res.status(400).json({ error: "Patient ID is required" });
+        }
+
+        // Fetch patient data
+        const patient = await Patient.findById(patientId);
+        if (!patient) {
+            return res.status(404).json({ error: "Patient not found" });
+        }
+
+        // Prepare full patient details
+        const patientData = patient.toObject(); // Convert Mongoose document to plain object
+        delete patientData._id; // Remove MongoDB ID if not needed
+        console.log(patientData);
+
+        // Send request to Flask API for health alerts
+        const response = await axios.post(`${process.env.FLASK_SERVER}/reports/healthAlerts`, patientData, {
+            headers: { "Content-Type": "application/json" },
+        });
+
+
+        console.log("Flask API Response:", response.data);
+        res.status(201).json(response.data);
+    } catch (error) {
+        console.error("Health Alerts Error:", error.toJSON ? error.toJSON() : error);
+
+        res.status(error.response?.status || 500).json({
+            error: error.response?.data?.error || "Failed to generate health alerts",
+        });
+    }
+};
 
   
   

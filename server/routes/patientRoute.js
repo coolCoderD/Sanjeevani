@@ -10,7 +10,8 @@ import { addReport,
     addChatReport,
     patientChat,
     createPatient,
-    createDietPlan, } from '../controllers/patientController.js';
+    createDietPlan,
+    createHealthAlerts, } from '../controllers/patientController.js';
 
 
 
@@ -50,6 +51,8 @@ router.put("/medicines/toggle-status", toggleMedicineStatus);
 router.post("/patients/add", createPatient);
 
 router.post("/reports/diet",createDietPlan);
+
+router.post('/reports/alerts',createHealthAlerts);
 
 
 router.get("/", (req, res) => {
