@@ -268,41 +268,260 @@ def dateValQuery():
         "title": title,
     }, 201
     
-def generate_diet_plan():
-    genai.configure(api_key=os.getenv("GENAI_API_KEY"))
-    generation_config = {
+# def generate_diet_plan():
+#     genai.configure(api_key=os.getenv("GENAI_API_KEY"))
+#     generation_config = {
+#         "temperature": 0.7,
+#         "top_p": 0.95,
+#         "top_k": 40,
+#         "max_output_tokens": 2000,
+#         "response_mime_type": "text/plain",
+#     }
+#     model = genai.GenerativeModel(
+#         model_name="gemini-1.5-flash",
+#         generation_config=generation_config,
+#     )
+#     chat_session = model.start_chat(history=[])
+
+#     data = request.get_json()
+#     patientId = data.get("patientId")
+
+#     # Query for medical report data
+#     report_data, status = dateValQuery()
+    
+#     if status != 201:
+#         return jsonify({"error": "Failed to fetch report data"}), 400
+
+#     # Extract key metrics
+#     health_data = f"Patient ID: {patientId}\n"
+#     health_data += f"Key Health Metrics: {report_data['list']}\n"
+#     health_data += f"Description: {report_data['description']}\n"
+    
+#     # Generate diet plan
+#     diet_plan_response = chat_session.send_message(
+#         health_data + " Suggest a personalized diet plan to improve the patient's health."
+#     )
+    
+#     return jsonify({
+#         "message": "Diet plan generated successfully",
+#         "diet_plan": diet_plan_response.text
+#     }), 201
+
+
+# Configure GenAI
+genai.configure(api_key=os.getenv("GENAI_API_KEY"))
+
+# Define the function to generate a diet plan
+def generate_diet_plan(patient_details):
+    """
+    Generates a personalized diet plan based on patient details.
+    """
+    model_config = {
         "temperature": 0.7,
-        "top_p": 0.95,
+        "top_p": 0.9,
         "top_k": 40,
         "max_output_tokens": 2000,
-        "response_mime_type": "text/plain",
+        "response_mime_type": "application/json",
     }
+
     model = genai.GenerativeModel(
         model_name="gemini-1.5-flash",
-        generation_config=generation_config,
+        generation_config=model_config,
     )
+
     chat_session = model.start_chat(history=[])
 
-    data = request.get_json()
-    patientId = data.get("patientId")
+    # Construct the AI prompt with patient data
+    queryText = f"""
+    Generate a **personalized diet plan** for the following patient:
 
-    # Query for medical report data
-    report_data, status = dateValQuery()
-    
-    if status != 201:
-        return jsonify({"error": "Failed to fetch report data"}), 400
+    **Patient Details:**
+    - Name: {patient_details.get('name', 'Unknown')}
+    - Sex: {patient_details.get('sex', 'Unknown')}
+    - Age: {patient_details.get('age', 'Unknown')}
+    - Blood Group: {patient_details.get('bloodGroup', 'Unknown')}
+    - Current Medical Condition: {patient_details.get('currentCondition', 'Unknown')}
+    - Medical History: {patient_details.get('medicalHistorySummary', 'Unknown')}
+    - Current Symptoms: {patient_details.get('currentSymptomsSummary', 'Unknown')}
+    - Assistive Diagnosis: {patient_details.get('assistiveDiagnosis', 'Unknown')}
 
-    # Extract key metrics
-    health_data = f"Patient ID: {patientId}\n"
-    health_data += f"Key Health Metrics: {report_data['list']}\n"
-    health_data += f"Description: {report_data['description']}\n"
+    **Recent Medical Reports Summary:**
+    {''.join([report['reportSummary'] for report in patient_details.get('reportsList', [])])}
+
+    **Medications:**
+    {''.join([f"{med['medicine']} ({med['dosage']}) - {med['status']}" for med in patient_details.get('medicinesList', [])])}
+
+    **Instructions:**
+    - Create a **structured meal plan** (breakfast, lunch, dinner, snacks).
+    - Adjust based on **medical conditions, dietary restrictions, and medications**.
+    - Include **macronutrient details (carbs, proteins, fats)**.
+    - **Ensure suitability for diabetes, hypertension, and other conditions if applicable**.
+
+    Return the response in JSON format with this structure:
+    {{
+        "Breakfast": "...",
+        "Lunch": "...",
+        "Dinner": "...",
+        "Snacks": "...",
+        "Notes": "..."
+    }}
+    """
+
+    response = chat_session.send_message(queryText)
     
-    # Generate diet plan
-    diet_plan_response = chat_session.send_message(
-        health_data + " Suggest a personalized diet plan to improve the patient's health."
-    )
-    
-    return jsonify({
+    # Parse AI response
+    raw_text = response._result.candidates[0].content.parts[0].text
+    parsed_response = json.loads(raw_text.strip())
+
+    return parsed_response
+
+
+def dateValQueryDietPlan():
+    """
+    Handles patient diet plan generation.
+    """
+    data = request.get_json()  # Receive full patient details
+
+    if not data:
+        return {"error": "Patient data is required"}, 400
+
+    # Call AI function to generate diet plan
+    diet_plan = generate_diet_plan(data)
+
+    return {
         "message": "Diet plan generated successfully",
-        "diet_plan": diet_plan_response.text
-    }), 201
+        "diet_plan": diet_plan,
+    }, 201
+    
+    
+def generate_health_alerts(patient_details):
+    """
+    Generates predictive health alerts based on patient details.
+    """
+    model_config = {
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "top_k": 40,
+        "max_output_tokens": 2000,
+        "response_mime_type": "application/json",
+    }
+
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config=model_config,
+    )
+
+    chat_session = model.start_chat(history=[])
+
+    queryText = f"""
+    Generate Predictive Health Alerts based on the following patient details:
+    
+    Patient Details:
+    - Name: {patient_details.get('name', 'Unknown')}
+    - Age: {patient_details.get('age', 'Unknown')}
+    - Sex: {patient_details.get('sex', 'Unknown')}
+    - Blood Group: {patient_details.get('bloodGroup', 'Unknown')}
+    - Current Medical Condition: {patient_details.get('currentCondition', 'Unknown')}
+    - Medical History: {patient_details.get('medicalHistorySummary', 'Unknown')}
+    - Current Symptoms: {patient_details.get('currentSymptomsSummary', 'Unknown')}
+    - Assistive Diagnosis: {patient_details.get('assistiveDiagnosis', 'Unknown')}
+    
+    Recent Medical Reports Summary:
+    {''.join([report['reportSummary'] for report in patient_details.get('reportsList', [])])}
+    
+    Medications:
+    {''.join([f"{med['medicine']} ({med['dosage']}) - {med['status']}" for med in patient_details.get('medicinesList', [])])}
+    
+    Instructions:
+    - Identify potential health risks based on current conditions, history, and symptoms.
+    - Predict possible complications related to existing health issues.
+    - Provide preventive measures to avoid risks.
+    - Suggest urgent actions if required.
+    - Return the response in JSON format with this structure:
+
+    {{
+        "alerts": [
+            {{
+                "title": "Alert Title",
+                "description": "Detailed explanation of the risk or warning",
+                "severity": "Low/Moderate/High",
+                "suggestedActions": ["Action 1", "Action 2"]
+            }},
+            ...
+        ]
+    }}
+    """
+
+    response = chat_session.send_message(queryText)
+    raw_text = response._result.candidates[0].content.parts[0].text
+    parsed_response = json.loads(raw_text.strip())
+
+    return parsed_response
+
+
+# def generate_health_alerts(patient_details):
+    """
+    Generates predictive health alerts based on patient details.
+    """
+    model_config = {
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "top_k": 40,
+        "max_output_tokens": 2000,
+        "response_mime_type": "application/json",
+    }
+
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config=model_config,
+    )
+
+    chat_session = model.start_chat(history=[])
+
+    # Construct AI prompt with patient data
+    queryText = f"""
+    Generate **Predictive Health Alerts** based on the following patient details:
+
+    **Patient Details:**
+    - Name: {patient_details.get('name', 'Unknown')}
+    - Age: {patient_details.get('age', 'Unknown')}
+    - Sex: {patient_details.get('sex', 'Unknown')}
+    - Blood Group: {patient_details.get('bloodGroup', 'Unknown')}
+    - Current Medical Condition: {patient_details.get('currentCondition', 'Unknown')}
+    - Medical History: {patient_details.get('medicalHistorySummary', 'Unknown')}
+    - Current Symptoms: {patient_details.get('currentSymptomsSummary', 'Unknown')}
+    - Assistive Diagnosis: {patient_details.get('assistiveDiagnosis', 'Unknown')}
+    
+    **Recent Medical Reports Summary:**
+    {''.join([report['reportSummary'] for report in patient_details.get('reportsList', [])])}
+
+    **Medications:**
+    {''.join([f"{med['medicine']} ({med['dosage']}) - {med['status']}" for med in patient_details.get('medicinesList', [])])}
+
+    **Instructions:**
+    - Identify **potential health risks** based on current conditions, history, and symptoms.
+    - Predict **possible complications** related to existing health issues.
+    - Provide **preventive measures** to avoid risks.
+    - Suggest **urgent actions** if required.
+    - Return the response in **JSON format** with this structure:
+
+    {{
+        "alerts": [
+            {{
+                "title": "Alert Title",
+                "description": "Detailed explanation of the risk or warning",
+                "severity": "Low/Moderate/High",
+                "suggestedActions": ["Action 1", "Action 2"]
+            }},
+            ...
+        ]
+    }}
+    """
+
+    response = chat_session.send_message(queryText)
+
+    # Parse AI response
+    raw_text = response._result.candidates[0].content.parts[0].text
+    parsed_response = json.loads(raw_text.strip())
+
+    return parsed_response

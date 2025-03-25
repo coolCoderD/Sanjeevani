@@ -25,15 +25,15 @@ def setup_pinecone():
         #     print(f"Deleted existing index '{index_name}'")
 
         # Create a new index with 768 dimensions
-        pc.create_index(
-            name=index_name,
-            dimension=768, 
-            metric='cosine', 
-            spec=ServerlessSpec(
-                cloud='aws',  
-                region='us-east-1',
-            ),
-        )
+        # pc.create_index(
+        #     name=index_name,
+        #     dimension=768, 
+        #     metric='cosine', 
+        #     spec=ServerlessSpec(
+        #         cloud='aws',  
+        #         region='us-east-1',
+        #     ),
+        # )
         print(f"Created new index '{index_name}' with 768 dimensions.")
     except Exception as err:
         print("Error setting up Pinecone:", err)
