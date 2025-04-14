@@ -105,7 +105,7 @@ const addReport = asyncHandler(async (req, res, next) => {
       let fileURL = await getBlobURL(reportPDFLink);
       const url = await getUploadURL(reportPDFLink, 600);
       console.log("⭐⭐ Generated Upload URL:", url);
-      
+       console.log("I need blob file url")
       // Create new report object
       const newReport = {
           reportName,
@@ -238,7 +238,8 @@ const reportAddSignedURL = asyncHandler(async (req, res) => {
       // Get Azure Blob upload URL
       const url = await getUploadURL(reportPDFLink, 600);
       
-      console.log("✅ Generated Upload URL:", url);
+      console.log("✅ Generated Upload URL:", url);  
+      console.log("I need blob file url")
 
       return res.status(200).json(
           new ApiResponse(
