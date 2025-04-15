@@ -35,6 +35,7 @@ export const uploadReportToAzure = async (reportName, patientId, file) => {
     }
 };
 
+
 // Add report
 export const addReport = async (reportName, patientId, file, setReports, setLoading, setError) => {
     try {

@@ -38,7 +38,7 @@ const formRecognizerClient = new DocumentAnalysisClient(
 );
 
 // Generate SAS token for reading a blob
-const generateBlobSasToken = (containerName,blobName ,expirySeconds = 600) => {
+const generateBlobSasToken = (containerName,blobName ,expirySeconds = 3600) => {
   const sharedKeyCredential = new StorageSharedKeyCredential(
     process.env.AZURE_STORAGE_ACCOUNT_NAME,
     process.env.AZURE_STORAGE_ACCOUNT_KEY
@@ -103,11 +103,19 @@ const extractTextFromPDF = async (blobName) => {
 };
 
 // Get direct blob URL (without SAS)
-const getBlobURL = async (blobName) => {
+async function getBlobURL(blobName) {
   const containerName = process.env.AZURE_BLOB_CONTAINER_NAME;
-  const blobClient = blobServiceClient.getContainerClient(containerName).getBlobClient(blobName);
+  
+  if (!process.env.AZURE_STORAGE_CONNECTION_STRING) {
+    throw new Error("AZURE_STORAGE_CONNECTION_STRING is missing.");
+  }
+
+  const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING);
+  const containerClient = blobServiceClient.getContainerClient(containerName);
+  const blobClient = containerClient.getBlobClient(blobName);
+
   return blobClient.url;
-};
+}
 
 // Delete blob from container
 const deleteBlob = async (blobName) => {
